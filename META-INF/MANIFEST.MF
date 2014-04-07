@@ -1,0 +1,2 @@
+Manifest-Version: 1.0
+Main-Class: com.singularity.ee.agent.systemagent.monitors.ArbitrarySqlMonitor

@@ -1,0 +1,44 @@
+<monitor>
+  <name>SqlExecutionMonitor</name>
+  <type>managed</type>
+  <description>Executes arbitrary SQL</description>
+  <monitor-configuration>
+  </monitor-configuration>
+  <monitor-run-task>
+    <type>java</type>
+    <name>SqlExecutionMonitor Run Task</name>
+    <display-name>SqlExecutionMonitor Task</display-name>
+    <description>SqlExecutionMonitor Task</description>
+    <execution-style>periodic</execution-style>
+    <execution-frequency-in-seconds>60</execution-frequency-in-seconds>
+    <execution-timeout-in-secs>60</execution-timeout-in-secs>
+
+    <!--
+
+    Make sure you change the following arguments. See README.md for more information.
+
+    driver-class: Class name of the JDBC driver to use. Make sure to also include the driver in the classpath.
+    url: JDBC URL to the database.
+    username: Database user ID.
+    password: Password.
+    metric-path: Optional path in the metric tree where the metrics should be placed.
+    sql: The query to be executed.
+
+    -->
+
+    <task-arguments>
+      <argument name="driver-class" is-required="false" default-value="com.mysql.jdbc.Driver"/>
+      <argument name="url" is-required="true" default-value="jdbc:mysql://CONTROLLER:3306/controller"/>
+      <argument name="username" is-required="false" default-value="root"/>
+      <argument name="password" is-required="false" default-value="PASSWORD"/>
+      <argument name="sql" is-required="false"
+                default-value="SELECT a.name AS &quot;Name&quot;, count(DISTINCT mm.node_id) AS &quot;Node Count&quot;, count(*) AS &quot;Metric Count&quot; FROM metricdata_min mm JOIN application a ON (a.id = mm.application_id) WHERE mm.ts_min = (SELECT max(ts_min) - 1 FROM metricdata_min) GROUP BY 1 ORDER BY 1"/>
+    </task-arguments>
+    <java-task>
+      <classpath>
+        SqlMonitor.jar:lib/commons-lang-2.4.jar:lib/commons-logging-1.1.1.jar:lib/machineagent.jar:lib/mysql-connector-java-5.1.17-bin.jar
+      </classpath>
+      <impl-class>com.singularity.ee.agent.systemagent.monitors.ArbitrarySqlMonitor</impl-class>
+    </java-task>
+  </monitor-run-task>
+</monitor>
