@@ -5,6 +5,7 @@ import com.singularity.ee.agent.systemagent.api.MetricWriter;
 import com.singularity.ee.agent.systemagent.api.TaskExecutionContext;
 import com.singularity.ee.agent.systemagent.api.TaskOutput;
 import com.singularity.ee.agent.systemagent.api.exception.TaskExecutionException;
+
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -25,6 +26,10 @@ public class ArbitrarySqlMonitor extends AManagedMonitor
     private String url;
     private String database;
     private String sql;
+    
+    public static String METRIC_CONNECTION_TIME_IN_MS = "Connection Time (ms)";
+    public static String METRIC_ROWS_RETURNED         = "Rows Returned";
+    public static String METRIC_EXECUTION_TIME_IN_MS  = "Execution Time (ms)";
 
 
     private String getArg(Map<String, String> map, String key, String defaultValue)
@@ -54,6 +59,11 @@ public class ArbitrarySqlMonitor extends AManagedMonitor
                     + clusterRollup);
         }
     }
+    
+	private void printMetric(String metricPath, String metricValue) {
+		printMetric(metricPath, metricValue, MetricWriter.METRIC_AGGREGATION_TYPE_AVERAGE, MetricWriter.METRIC_TIME_ROLLUP_TYPE_AVERAGE,
+				MetricWriter.METRIC_CLUSTER_ROLLUP_TYPE_COLLECTIVE);
+	}
 
     private String cleanFieldName(String name)
     {
@@ -108,11 +118,7 @@ public class ArbitrarySqlMonitor extends AManagedMonitor
                 conn.setCatalog(database);
             }
             long elapsedTime = System.currentTimeMillis() - startTime;
-
-            printMetric("Connection Time (ms)", Long.toString(elapsedTime),
-                    MetricWriter.METRIC_AGGREGATION_TYPE_OBSERVATION,
-                    MetricWriter.METRIC_TIME_ROLLUP_TYPE_CURRENT,
-                    MetricWriter.METRIC_CLUSTER_ROLLUP_TYPE_COLLECTIVE);
+            printMetric(METRIC_CONNECTION_TIME_IN_MS, Long.toString(elapsedTime));
             logger.debug("Connection time = " + elapsedTime);
 
             logger.info("Executing query: " + sql);
@@ -131,10 +137,7 @@ public class ArbitrarySqlMonitor extends AManagedMonitor
                 {
                     String metricName = cleanFieldName(rs.getMetaData()
                             .getColumnName(i));
-                    printMetric(key + "|" + metricName, rs.getString(i),
-                            MetricWriter.METRIC_AGGREGATION_TYPE_OBSERVATION,
-                            MetricWriter.METRIC_TIME_ROLLUP_TYPE_CURRENT,
-                            MetricWriter.METRIC_CLUSTER_ROLLUP_TYPE_COLLECTIVE);
+                    printMetric(key + "|" + metricName,  rs.getString(i));
                     logger.debug(key + "|" + metricName + " = " + rs.getString(i));
                 }
 
@@ -142,16 +145,9 @@ public class ArbitrarySqlMonitor extends AManagedMonitor
             }
 
             elapsedTime = System.currentTimeMillis() - startTime;
-            printMetric("Execution Time (ms)", Long.toString(elapsedTime),
-                    MetricWriter.METRIC_AGGREGATION_TYPE_OBSERVATION,
-                    MetricWriter.METRIC_TIME_ROLLUP_TYPE_CURRENT,
-                    MetricWriter.METRIC_CLUSTER_ROLLUP_TYPE_COLLECTIVE);
+            printMetric(METRIC_EXECUTION_TIME_IN_MS, Long.toString(elapsedTime));
             logger.debug("Execution time = " + elapsedTime);
-
-            printMetric("Rows Returned", Long.toString(rowCount),
-                    MetricWriter.METRIC_AGGREGATION_TYPE_OBSERVATION,
-                    MetricWriter.METRIC_TIME_ROLLUP_TYPE_CURRENT,
-                    MetricWriter.METRIC_CLUSTER_ROLLUP_TYPE_COLLECTIVE);
+            printMetric(METRIC_ROWS_RETURNED, Long.toString(rowCount));
             logger.debug("Rows returned = " + rowCount);
 
             logger.info("Query completed successfully");
@@ -214,15 +210,14 @@ public class ArbitrarySqlMonitor extends AManagedMonitor
             throws Exception
     {
         Map<String, String> taskParams = new HashMap<String, String>();
-        taskParams.put("driver-class", "com.mysql.MysqlDriver");
-        taskParams.put("url", "jdbc:mysql://localhost:3306");
+        taskParams.put("driver-class", "com.mysql.jdbc.Driver");
+        taskParams.put("url", "jdbc:mysql://localhost:3388");
         taskParams.put("database", "controller");
         taskParams.put("username", "root");
-        taskParams.put("password", "PASSWORD");
+        taskParams.put("password", "admin1-2");
         taskParams.put("metric-path", "Server|Component:ArbitrarySqlMonitor|SolarWinds");
         taskParams.put("sql",
-                "SELECT Nodes.Caption AS NodeName, Nodes.CPULoad AS CPU_Load, Nodes.PercentMemoryUsed AS PercentMemoryUsed " +
-                        " FROM Nodes WHERE ((Nodes.Hourly_Dash_Relevant = 1) AND (Nodes.CPULoad > -1))");
+                "SELECT a.name AS \"Name\", count(DISTINCT mm.node_id) AS \"Node Count\", count(*) AS \"Metric Count\" FROM metricdata_min mm JOIN application a ON (a.id = mm.application_id) WHERE mm.ts_min = (SELECT max(ts_min) - 1 FROM metricdata_min) GROUP BY 1 ORDER BY 1");
         new ArbitrarySqlMonitor().execute(taskParams, null);
     }
 }
